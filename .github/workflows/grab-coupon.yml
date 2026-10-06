@@ -39,6 +39,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Diagnose
+        run: node scripts/diagnose.js
+        env:
+          TOKEN: ${{ secrets.TOKEN }}
+
       - name: Run app
         run: pnpm start
         env:
