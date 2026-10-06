@@ -65,6 +65,20 @@ async function diagnose(cookie, gid, guard) {
     )
   }
 
+  if (ri?.componentRenderInfos) {
+    for (const [k, v] of Object.entries(ri.componentRenderInfos)) {
+      if (v.render) console.log('[renderInfo]', k, JSON.stringify(v).slice(0, 1500))
+    }
+  }
+
+  // 模板 HTML 中与渲染组件相关的上下文
+  for (const kw of ['16970942475030.86692166477736240', 'componentList', 'compList', 'serverData']) {
+    const hits = findAll(text, kw, 2)
+
+    console.log(`[templateHtml] "${kw}" 命中 ${hits.length} 处`)
+    hits.forEach((i) => console.log('  ...', around(text, i, 300, 1200), '...'))
+  }
+
   const jsUrls = text.match(/https:\/\/[^"']*?\.js/g) || []
 
   console.log('[template] js urls:', [...new Set(jsUrls)].slice(0, 20))
@@ -118,8 +132,16 @@ async function diagnose(cookie, gid, guard) {
     try {
       const body = await request(u).then((r) => r.text())
       const hits = KWS.filter((kw) => body.includes(kw))
+      const apis = [
+        ...new Set(
+          (body.match(new RegExp("(?:https?:)?//[a-z.]*meituan\\.com/[\\w/.-]{3,120}|[\"']/[\\w-]+/[\\w/.-]{3,100}[\"']", 'g')) || [])
+        )
+      ].slice(0, 40)
+      const nameMatch = body.match(/gdc-[a-z0-9-]+/g) || []
 
       console.log('[component]', u.split('/').slice(-2)[0], body.length, hits)
+      console.log('  names:', [...new Set(nameMatch)].slice(0, 10).join(','))
+      console.log('  apis:', apis.join(' '))
     } catch (e) {
       console.log('[component] 获取失败', u, e?.message || e)
     }
