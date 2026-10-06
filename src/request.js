@@ -71,12 +71,16 @@ async function request(url, opts = {}) {
       throw { code: ECODE.TIMEOUT, req: urlObj, msg: e }
     }
 
-    throw { code: ECODE.FETCH, req: urlObj, msg: res.statusText }
+    throw {
+      code: ECODE.NETWOEK,
+      req: urlObj,
+      msg: e?.cause?.message || e?.message
+    }
   }
 
-  const setCookies = res.headers['set-cookie']
+  const setCookies = res.headers.getSetCookie?.() || []
 
-  if (setCookies) {
+  if (setCookies.length) {
     setCookies.map((cookie) =>
       cookieJar?.setCookieSync(cookie, res.url, { ignoreError: true })
     )
