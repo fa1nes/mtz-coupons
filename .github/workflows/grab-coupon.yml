@@ -39,12 +39,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Diagnose
-        run: node scripts/diagnose.js
+      - name: Capture
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null
+          npm i playwright@1.48.2 >/dev/null 2>&1
+          npx playwright install --with-deps chromium >/dev/null 2>&1
+          node $GITHUB_WORKSPACE/scripts/capture.cjs
         env:
           TOKEN: ${{ secrets.TOKEN }}
 
       - name: Run app
+        if: false
         run: pnpm start
         env:
           TOKEN: ${{ secrets.TOKEN }}
