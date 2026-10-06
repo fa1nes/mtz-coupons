@@ -128,7 +128,7 @@ async function diagnose(cookie, gid, guard) {
     }
   }
 
-  for (const u of [...new Set(jsUrls)].filter((u) => u.includes('gundam-component'))) {
+  for (const u of [...new Set(jsUrls)].filter((u) => u.includes('gundam-component') && false)) {
     try {
       const body = await request(u).then((r) => r.text())
       const hits = KWS.filter((kw) => body.includes(kw))
@@ -165,31 +165,44 @@ async function diagnose(cookie, gid, guard) {
     return
   }
 
-  // 新版：运行时拉取组件配置
-  try {
-    const ids = tmplData.renderList
-    const res = await request.post(
-      'https://market.waimai.meituan.com/component/instanceProps',
-      { pageId: globalData.pageId, tenantId: 'gundam', instanceIds: ids },
-      {
-        cookie,
-        headers: {
-          Origin: 'https://market.waimai.meituan.com',
-          Referer: gundam.getActUrl(gid).toString()
-        }
-      }
-    )
+  // 新版：运行时拉取组件配置，多种请求方式对比
+  const ipUrl = 'https://market.waimai.meituan.com/component/instanceProps'
+  const ids = tmplData.renderList
+  const base = { pageId: globalData.pageId, tenantId: 'gundam', instanceIds: ids }
+  const hdr = {
+    Origin: 'https://market.waimai.meituan.com',
+    Referer: gundam.getActUrl(gid).toString()
+  }
+  const variants = {
+    json: () => request.post(ipUrl, base, { cookie, headers: hdr }),
+    jsonGuard: () =>
+      request.post(ipUrl, base, { cookie, headers: hdr, guard }),
+    form: () =>
+      request.post(
+        ipUrl,
+        { ...base, instanceIds: JSON.stringify(ids) },
+        { cookie, headers: hdr, type: 'form' }
+      ),
+    formCsv: () =>
+      request.post(
+        ipUrl,
+        { ...base, instanceIds: ids.join(',') },
+        { cookie, headers: hdr, type: 'form', guard }
+      ),
+    gdIdJson: () =>
+      request.post(ipUrl, { ...base, gdId: globalData.gdId }, { cookie, headers: hdr, guard })
+  }
 
-    console.log('[instanceProps API] code:', res.code, 'keys:', Object.keys(res.data || {}))
-    for (const [id, props] of Object.entries(res.data || {})) {
-      const str = typeof props == 'string' ? props : JSON.stringify(props)
+  for (const [name, fn] of Object.entries(variants)) {
+    try {
+      const res = await fn()
+      const str = JSON.stringify(res)
 
-      console.log(`\n[instanceProps API] ${id} type=${typeof props} len=${str.length}`)
-      console.log('  head:', str.slice(0, 400))
-      dump(`props ${id}`, str)
+      console.log(`\n[instanceProps ${name}] len=${str.length} head:`, str.slice(0, 600))
+      if (str.length > 200) dump(`instanceProps ${name}`, str)
+    } catch (e) {
+      console.log(`[instanceProps ${name}] 失败:`, JSON.stringify(e)?.slice(0, 300))
     }
-  } catch (e) {
-    console.log('[instanceProps API] 失败:', JSON.stringify(e)?.slice(0, 500), e?.message)
   }
 
   return
