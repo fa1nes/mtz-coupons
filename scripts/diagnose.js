@@ -142,6 +142,11 @@ async function diagnose(cookie, gid, guard) {
       console.log('[component]', u.split('/').slice(-2)[0], body.length, hits)
       console.log('  names:', [...new Set(nameMatch)].slice(0, 10).join(','))
       console.log('  apis:', apis.join(' '))
+      for (const kw of ['/component/instanceProps', '/gundam/data', '/gd/zc/', 'renderinfo']) {
+        findAll(body, kw, 2).forEach((i) =>
+          console.log(`  [ctx ${kw}] ...`, around(body, i, 1200, 1500), '...')
+        )
+      }
     } catch (e) {
       console.log('[component] 获取失败', u, e?.message || e)
     }
