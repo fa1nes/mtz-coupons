@@ -10,8 +10,18 @@ async function runTask(cookie, guard) {
     // 优先检测登录状态
     const userInfo = await getUserInfo(cookie)
 
-    // 主线任务，失败时向外抛出异常
-    const results = await gundam.grabCoupon(cookie, mainActConf.gid, guard)
+    // 主线任务，失败时降级执行支线任务（登录过期直接抛出）
+    let mainError = null
+    const results = await gundam
+      .grabCoupon(cookie, mainActConf.gid, guard)
+      .catch((e) => {
+        if (e?.code == ECODE.AUTH) throw e
+
+        mainError = e
+        console.log(`[${mainActConf.name}] 领取失败:`, e?.message || e)
+
+        return []
+      })
 
     // 支线任务，并行执行提升效率
     const asyncResults = await Promise.all([
@@ -25,6 +35,9 @@ async function runTask(cookie, guard) {
     ])
 
     results.push(...asyncResults.flat())
+
+    // 全部活动都没领到时，按主线异常处理
+    if (mainError && !results.length) throw mainError
 
     return {
       code: ECODE.SUCC,
@@ -89,9 +102,7 @@ async function grabCoupons(token, { maxRetry = 0, proxy }) {
 
   async function main(retryTimes = 0) {
     const result = await runTask(cookieJar, guard)
-    const needRetry = [request.ECODE.NETWOEK, request.ECODE.API].includes(
-      result.code
-    )
+    const needRetry = [ECODE.NETWOEK, ECODE.API].includes(result.code)
 
     // 标记重试次数
     result['retryTimes'] = retryTimes

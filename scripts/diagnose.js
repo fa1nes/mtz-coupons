@@ -69,6 +69,62 @@ async function diagnose(cookie, gid, guard) {
 
   console.log('[template] js urls:', [...new Set(jsUrls)].slice(0, 20))
 
+  const KWS = [
+    'red-envelope',
+    'netunion',
+    'expandCouponIds',
+    'priorityCouponIds',
+    'isStopTJCoupon',
+    'gundamGrab'
+  ]
+  const dump = (label, body) => {
+    console.log(`\n[${label}] length:`, body.length)
+    for (const kw of KWS) {
+      const hits = findAll(body, kw, 2)
+
+      console.log(`[${label}] "${kw}" 命中 ${hits.length} 处`)
+      hits.forEach((i) => console.log('  ...', around(body, i, 300, 600), '...'))
+    }
+  }
+
+  // renderTree 中的组件名
+  const names = []
+  const walk = (n) => {
+    if (!n || typeof n != 'object') return
+    if (n.name && (n.instanceID || n.id)) names.push(`${n.name}#${n.instanceID || n.id}`)
+    Object.values(n).forEach(walk)
+  }
+
+  walk(globalData.renderTree)
+  console.log('[renderTree] components:', [...new Set(names)].slice(0, 120).join('\n  '))
+  dump('renderTree', JSON.stringify(globalData.renderTree || {}))
+  dump('instanceProps', JSON.stringify(globalData.instanceProps || {}))
+  console.log('[pageConfigJsonUrl]', globalData.pageConfigJsonUrl)
+
+  if (globalData.pageConfigJsonUrl) {
+    try {
+      const cfgUrl = globalData.pageConfigJsonUrl.startsWith('//')
+        ? 'https:' + globalData.pageConfigJsonUrl
+        : globalData.pageConfigJsonUrl
+      const cfgText = await request(cfgUrl).then((r) => r.text())
+
+      dump('pageConfig', cfgText)
+    } catch (e) {
+      console.log('[pageConfig] 获取失败', e?.message || e)
+    }
+  }
+
+  for (const u of [...new Set(jsUrls)].filter((u) => u.includes('gundam-component'))) {
+    try {
+      const body = await request(u).then((r) => r.text())
+      const hits = KWS.filter((kw) => body.includes(kw))
+
+      console.log('[component]', u.split('/').slice(-2)[0], body.length, hits)
+    } catch (e) {
+      console.log('[component] 获取失败', u, e?.message || e)
+    }
+  }
+
   let tmplData
 
   try {
@@ -82,7 +138,7 @@ async function diagnose(cookie, gid, guard) {
     return
   }
 
-  if (!tmplData.appJs) return
+  return
 
   const jsText = await request(tmplData.appJs).then((r) => r.text())
 
@@ -116,7 +172,7 @@ async function main() {
 
   console.log('[guard] h5fp ok:', !!guard.h5fp, 'dfpId ok:', !!guard.context.dfpId)
 
-  for (const conf of [mainActConf, ...gundamActConfs]) {
+  for (const conf of [mainActConf]) {
     try {
       await diagnose(cookie, conf.gid, guard)
     } catch (e) {

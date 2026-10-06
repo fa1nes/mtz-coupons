@@ -231,6 +231,9 @@ async function main() {
   // 打印通知结果，用户通知优先
   await printNotifyResult(userPushQueue.concat(globalPushQueue))
 
+  // 有账号领取失败时以非 0 退出，让 Actions 显示失败
+  if (tasks.some((t) => t.status == 'error')) process.exitCode = 1
+
   checkUpdate(CHECK_UPDATE_TIMEOUT)
 }
 
