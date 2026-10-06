@@ -165,6 +165,33 @@ async function diagnose(cookie, gid, guard) {
     return
   }
 
+  // 新版：运行时拉取组件配置
+  try {
+    const ids = tmplData.renderList
+    const res = await request.post(
+      'https://market.waimai.meituan.com/component/instanceProps',
+      { pageId: globalData.pageId, tenantId: 'gundam', instanceIds: ids },
+      {
+        cookie,
+        headers: {
+          Origin: 'https://market.waimai.meituan.com',
+          Referer: gundam.getActUrl(gid).toString()
+        }
+      }
+    )
+
+    console.log('[instanceProps API] code:', res.code, 'keys:', Object.keys(res.data || {}))
+    for (const [id, props] of Object.entries(res.data || {})) {
+      const str = typeof props == 'string' ? props : JSON.stringify(props)
+
+      console.log(`\n[instanceProps API] ${id} type=${typeof props} len=${str.length}`)
+      console.log('  head:', str.slice(0, 400))
+      dump(`props ${id}`, str)
+    }
+  } catch (e) {
+    console.log('[instanceProps API] 失败:', JSON.stringify(e)?.slice(0, 500), e?.message)
+  }
+
   return
 
   const jsText = await request(tmplData.appJs).then((r) => r.text())
